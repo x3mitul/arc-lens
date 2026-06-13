@@ -1,0 +1,14 @@
+.vscode/**
+src/**
+tsconfig.json
+scripts/**
+data/**
+*.vsix
+.gitignore
+package-lock.json
+node_modules/**
+media/demo_dashboard.html
+PUBLISHING.md
+**/__pycache__/**
+**/*.pyc
+python/**

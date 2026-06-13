@@ -1,0 +1,9 @@
+node_modules/
+out/
+.vscode/settings.json
+*.vsix
+__pycache__/
+*.pyc
+.DS_Store
+data/*.jsonl
+data/run_events.json

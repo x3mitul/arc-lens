@@ -1,0 +1,74 @@
+{
+  "name": "arc-lens",
+  "displayName": "ARC Lens - Self-Healing ML Trainer",
+  "description": "Interactive dashboard and autonomous recovery agent for PyTorch training, built for the ARC (Autonomous Recovery Controller) ecosystem.",
+  "version": "0.1.0",
+  "publisher": "arclens",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/x3mitul/arc-lens.git"
+  },
+  "homepage": "https://github.com/x3mitul/arc-lens",
+  "bugs": {
+    "url": "https://github.com/x3mitul/arc-lens/issues"
+  },
+  "license": "MIT",
+  "icon": "media/logo.png",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Machine Learning", "Visualization", "Debuggers"],
+  "activationEvents": ["onLanguage:python"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "arc-lens.run",
+        "title": "▶ Run with ARC Lens",
+        "category": "ARC Lens",
+        "icon": {
+          "light": "media/logo_dark.png",
+          "dark": "media/logo_light.png"
+        }
+      },
+      {
+        "command": "arc-lens.stop",
+        "title": "⏹ Stop ARC Lens",
+        "category": "ARC Lens",
+        "icon": "$(debug-stop)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "arc-lens.run",
+          "when": "resourceExtname == .py",
+          "group": "navigation@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "ARC Lens",
+      "properties": {
+        "arcAgent.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Path to the Python interpreter to use (e.g. /home/user/.venv/bin/python)"
+        },
+        "arcAgent.stepDelay": {
+          "type": "number",
+          "default": 0.02,
+          "description": "Artificial delay (in seconds) introduced after each training step to pace visualization. Default is 0.02s."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile && node scripts/embed_python.js",
+    "compile": "tsc -p ./ && node scripts/embed_python.js",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}

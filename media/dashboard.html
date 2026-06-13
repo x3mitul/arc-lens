@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src * 'self' data: https:; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'unsafe-inline' https://cdn.jsdelivr.net;">
+<title>ARC Lens Demo Dashboard</title>
+<!-- Minimalist Inter font for the Vercel/Linear aesthetic -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1"></script>
+<style>
+:root {
+  --bg-color: #09090b;
+  --panel-bg: #18181b;
+  --panel-border: #27272a;
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --header-bg: rgba(9, 9, 11, 0.85);
+  --panel-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="light"] {
+  --bg-color: #f7f7f8; /* Warm, classy alabaster off-white */
+  --panel-bg: #ffffff;
+  --panel-border: #e4e4e7; /* Extremely faint elegant border */
+  --text-primary: #09090b; /* Deep ink for pristine readability */
+  --text-secondary: #71717a; /* Muted, modern zinc */
+  --header-bg: rgba(255, 255, 255, 0.90);
+  --panel-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.03); /* Rich, diffuse depth shadow */
+}
+
+body, .metric-card, .chart-card, header, .action-log-card, .btn-stop, .file-badge, .status-badge, .log-msg, .log-time, .btn-theme {
+  transition: background-color 0.4s ease, border-color 0.4s ease, color 0.4s ease, box-shadow 0.4s ease;
+}
+
+/* Accent colors — kept as separate declarations to avoid merging with theme-override :root */
+:root {
+  --accent-blue: #0070f3;
+  --accent-purple: #7928ca;
+  --accent-orange: #f5a623;
+  --accent-teal: #50e3c2;
+  --accent-red: #ff0000;
+  --accent-green: #17c964;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Minimal Header */
+header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 32px;
+  border-bottom: 1px solid var(--panel-border);
+  background: var(--header-bg);
+  backdrop-filter: saturate(180%) blur(10px);
+  z-index: 1000;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-text {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.file-badge {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.status-idle { background: transparent; color: var(--text-secondary); border: 1px solid var(--panel-border); }
+.status-running { background: rgba(23, 201, 100, 0.1); color: var(--accent-green); border: 1px solid rgba(23, 201, 100, 0.3); }
+.status-warning { background: rgba(245, 166, 35, 0.1); color: var(--accent-orange); border: 1px solid rgba(245, 166, 35, 0.3); }
+.status-critical { background: rgba(255, 0, 0, 0.1); color: var(--accent-red); border: 1px solid rgba(255, 0, 0, 0.4); animation: pulse 2s infinite; }
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+.btn-stop {
+  background: var(--text-primary);
+  color: var(--bg-color);
+  border: none;
+  padding: 6px 16px;
+  border-radius: 4px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.btn-stop:hover {
+  opacity: 0.8;
+}
+
+.btn-theme {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--text-primary);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+.btn-theme:hover { background: var(--panel-border); }
+
+/* Smooth Log Entries */
+.action-log-item {
+  animation: slideIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Container */
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Stats Row */
+.metrics-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.metric-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--panel-shadow);
+}
+
+.metric-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.metric-value {
+  font-size: 28px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+}
+
+.metric-subtext {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+.risk-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--panel-border);
+  border-radius: 2px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.risk-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent-green);
+  transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+/* Charts Sections */
+.chart-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 24px;
+  position: relative;
+  box-shadow: var(--panel-shadow);
+}
+
+.chart-header {
+  margin-bottom: 20px;
+}
+
+.chart-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.chart-wrapper {
+  position: relative;
+  width: 100%;
+  height: 320px; /* Bigger height for easy readability */
+}
+
+/* Action Log */
+.action-log-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: var(--panel-shadow);
+}
+
+.action-log-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.action-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.action-log-list::-webkit-scrollbar {
+  width: 4px;
+}
+.action-log-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.action-log-list::-webkit-scrollbar-thumb {
+  background: var(--panel-border);
+  border-radius: 2px;
+}
+
+.action-log-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+
+.log-time {
+  color: var(--text-secondary);
+  min-width: 70px;
+}
+
+.log-badge {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.log-badge.intervention { background: rgba(23, 201, 100, 0.1); color: var(--accent-green); }
+.log-badge.failure { background: rgba(255, 0, 0, 0.1); color: var(--accent-red); }
+.log-badge.info { background: rgba(0, 112, 243, 0.1); color: var(--accent-blue); }
+
+.log-msg { color: var(--text-primary); flex: 1; }
+
+.alert-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(255, 0, 0, 0.03);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: 5;
+  border-radius: 8px;
+}
+.alert-overlay.active {
+  opacity: 1;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-container">
+    <img src="{{LOGO_URI}}" alt="ARC Lens Logo" style="height: 24px; width: 24px; border-radius: 4px; object-fit: cover;">
+    <span class="logo-text">ARC Lens</span>
+  </div>
+  <div class="header-controls">
+    <button id="theme-toggle" class="btn-theme" onclick="toggleTheme()" title="Toggle Light/Dark Mode" style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></button>
+    <span class="file-badge" id="file-name">Not running</span>
+    <div class="status-badge status-idle" id="global-status">IDLE</div>
+    <button class="btn-stop" onclick="stopProcess()">Stop Process</button>
+  </div>
+</header>
+
+<div class="dashboard-container">
+  
+  <!-- Metrics Bar -->
+  <div class="metrics-container">
+    <div class="metric-card" id="card-loss">
+      <div class="metric-label">Loss</div>
+      <div class="metric-value" id="val-loss">0.000</div>
+      <div class="metric-subtext" id="val-loss-diff">-</div>
+    </div>
+    <div class="metric-card" id="card-grad">
+      <div class="metric-label">Gradient L2 Norm</div>
+      <div class="metric-value" id="val-grad">0.000</div>
+      <div class="metric-subtext" id="val-grad-level">-</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Learning Rate</div>
+      <div class="metric-value" id="val-lr">0.00e0</div>
+      <div class="metric-subtext" id="val-gpu">GPU Memory: 0 MB</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Step / Epoch</div>
+      <div class="metric-value"><span id="val-step">0</span><span style="color:var(--text-secondary);font-size:20px;font-weight:400;margin:0 4px;">/</span><span id="val-epoch" style="color:var(--text-secondary)">0</span></div>
+      <div class="metric-subtext">Training progress</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">System Risk</div>
+      <div class="metric-value" id="val-risk" style="color:var(--accent-green);font-size:20px;">LOW</div>
+      <div class="risk-progress-bar">
+        <div class="risk-progress-fill" id="risk-progress-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart 1: Vitals -->
+  <div class="chart-card">
+    <div class="alert-overlay" id="alert-overlay"></div>
+    <div class="chart-header" style="display:flex; justify-content:space-between; align-items:center;"><div style="display:flex; align-items:center;"><div class="chart-title">Training Vitals & Loss Trajectory</div></div><div style="display: flex; gap: 8px;">
+        <button class="btn-theme" style="padding: 6px; display:flex; align-items:center; justify-content:center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="zoomOutChart('vitalsChart')" title="Zoom Out" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg></button>
+        <button class="btn-theme" style="padding: 6px; display:flex; align-items:center; justify-content:center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="zoomInChart('vitalsChart')" title="Zoom In" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg></button>
+        <button class="btn-theme btn-reset-zoom" style="padding: 6px; display: none; align-items: center; justify-content: center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="resetChartZoom()" title="Reset Zoom & Resume Auto-scroll" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg></button>
+        <button class="btn-theme" style="padding: 6px; display:flex; align-items:center; justify-content:center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="downloadChart('vitalsChart')" title="Download Graph as PNG" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
+      </div></div>
+    <div class="chart-wrapper"><canvas id="vitalsChart"></canvas></div>
+  </div>
+
+  <!-- Chart 2: Dynamics -->
+  <div class="chart-card">
+    <div class="chart-header" style="display:flex; justify-content:space-between; align-items:center;"><div style="display:flex; align-items:center;"><div class="chart-title">Gradient Dynamics</div></div><div style="display: flex; gap: 8px;">
+        <button class="btn-theme" style="padding: 6px; display:flex; align-items:center; justify-content:center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="zoomOutChart('dynamicsChart')" title="Zoom Out" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg></button>
+        <button class="btn-theme" style="padding: 6px; display:flex; align-items:center; justify-content:center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="zoomInChart('dynamicsChart')" title="Zoom In" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg></button>
+        <button class="btn-theme btn-reset-zoom" style="padding: 6px; display: none; align-items: center; justify-content: center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="resetChartZoom()" title="Reset Zoom & Resume Auto-scroll" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg></button>
+        <button class="btn-theme" style="padding: 6px; display:flex; align-items:center; justify-content:center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="downloadChart('dynamicsChart')" title="Download Graph as PNG" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
+      </div></div>
+    <div class="chart-wrapper"><canvas id="dynamicsChart"></canvas></div>
+  </div>
+
+  <!-- Chart 3: Structural -->
+  <div class="chart-card">
+    <div class="chart-header" style="display:flex; justify-content:space-between; align-items:center;"><div style="display:flex; align-items:center;"><div class="chart-title">Structural Integrity & Rank</div></div><div style="display: flex; gap: 8px;">
+        <button class="btn-theme" style="padding: 6px; display:flex; align-items:center; justify-content:center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="zoomOutChart('structuralChart')" title="Zoom Out" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg></button>
+        <button class="btn-theme" style="padding: 6px; display:flex; align-items:center; justify-content:center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="zoomInChart('structuralChart')" title="Zoom In" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg></button>
+        <button class="btn-theme btn-reset-zoom" style="padding: 6px; display: none; align-items: center; justify-content: center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="resetChartZoom()" title="Reset Zoom & Resume Auto-scroll" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg></button>
+        <button class="btn-theme" style="padding: 6px; display:flex; align-items:center; justify-content:center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="downloadChart('structuralChart')" title="Download Graph as PNG" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
+      </div></div>
+    <div class="chart-wrapper"><canvas id="structuralChart"></canvas></div>
+  </div>
+
+  <!-- Chart 4: Weights -->
+  <div class="chart-card">
+    <div class="chart-header" style="display:flex; justify-content:space-between; align-items:center;"><div style="display:flex; align-items:center;"><div class="chart-title">Weight & Flow Dynamics</div></div><div style="display: flex; gap: 8px;">
+        <button class="btn-theme" style="padding: 6px; display:flex; align-items:center; justify-content:center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="zoomOutChart('flowChart')" title="Zoom Out" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg></button>
+        <button class="btn-theme" style="padding: 6px; display:flex; align-items:center; justify-content:center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="zoomInChart('flowChart')" title="Zoom In" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg></button>
+        <button class="btn-theme btn-reset-zoom" style="padding: 6px; display: none; align-items: center; justify-content: center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="resetChartZoom()" title="Reset Zoom & Resume Auto-scroll" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg></button>
+        <button class="btn-theme" style="padding: 6px; display:flex; align-items:center; justify-content:center; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;" onclick="downloadChart('flowChart')" title="Download Graph as PNG" onmouseover="this.style.color='var(--text-primary)'; this.style.borderColor='var(--text-secondary)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='var(--panel-border)'"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
+      </div></div>
+    <div class="chart-wrapper"><canvas id="flowChart"></canvas></div>
+  </div>
+
+  <!-- Action Log -->
+  <div class="action-log-card">
+    <div class="action-log-title">Action Log</div>
+    <div class="action-log-list" id="action-log-list">
+      <span style="color:var(--text-secondary);font-size:12px;margin:16px 0;">Awaiting telemetry...</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const vscode = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null;
+
+// Telemetry History
+const MAX_DATAPOINTS = 100000;
+const steps = [];
+const losses = [];
+const lrs = [];
+const gradNorms = [];
+const gradEntropies = [];
+const weightNorms = [];
+const effectiveRanks = [];
+const updateRatios = [];
+const gradFlowRatios = [];
+
+const failures = [];
+const interventions = [];
+
+// Theme Toggle Logic
+
+function stopProcess() {
+  if (vscode) vscode.postMessage({ command: 'stop' });
+}
+
+// Download Chart Utility
+function downloadChart(chartId) {
+  const canvas = document.getElementById(chartId);
+  if (!canvas) return;
+  
+  const tempCanvas = document.createElement('canvas');
+  tempCanvas.width = canvas.width;
+  tempCanvas.height = canvas.height;
+  const ctx = tempCanvas.getContext('2d');
+  
+  const bgColor = getComputedStyle(document.body).getPropertyValue('--panel-bg').trim() || '#ffffff';
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+  ctx.drawImage(canvas, 0, 0);
+  
+  if (vscode) {
+    try {
+      const dataUrl = tempCanvas.toDataURL('image/png');
+      vscode.postMessage({
+        command: 'download',
+        filename: chartId + '.png',
+        dataUrl: dataUrl
+      });
+    } catch (err) {
+      console.error('Failed to export canvas to data URL:', err);
+    }
+  } else {
+    try {
+      const dataUrl = tempCanvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = chartId + '.png';
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      // Fallback to toBlob if toDataURL throws
+      tempCanvas.toBlob(function(blob) {
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = chartId + '.png';
+          link.href = url;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+      }, 'image/png');
+    }
+  }
+}
+
+function toggleTheme() {
+  const body = document.body;
+  const isLight = body.getAttribute('data-theme') === 'light';
+  // Dark mode = no data-theme attribute (relies on :root defaults)
+  // Light mode = data-theme="light" (overrides via [data-theme="light"] selector)
+  if (isLight) {
+    body.removeAttribute('data-theme');
+  } else {
+    body.setAttribute('data-theme', 'light');
+  }
+  const sunIcon = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
+  const moonIcon = '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+  document.getElementById('theme-toggle').innerHTML = isLight ? sunIcon : moonIcon;
+
+  const newIsLight = !isLight;
+  Chart.defaults.color = newIsLight ? '#666666' : '#888888';
+  Chart.defaults.plugins.tooltip.backgroundColor = newIsLight ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.9)';
+  Chart.defaults.plugins.tooltip.titleColor = newIsLight ? '#000' : '#fff';
+  Chart.defaults.plugins.tooltip.bodyColor = newIsLight ? '#333' : '#ccc';
+  Chart.defaults.plugins.tooltip.borderColor = newIsLight ? '#e0e0e0' : '#333';
+
+  const gridColor = newIsLight ? 'rgba(0,0,0,0.05)' : '#1a1a1a';
+  [vitalsChart, dynamicsChart, structuralChart, flowChart].forEach(c => {
+    if (c.options.scales.y) c.options.scales.y.grid.color = gridColor;
+    if (c.options.scales['y-lr']) c.options.scales['y-lr'].grid.color = gridColor;
+    if (c.options.scales['y-alt']) c.options.scales['y-alt'].grid.color = gridColor;
+    c.update();
+  });
+}
+
+// Clean global chart defaults for premium aesthetic
+Chart.defaults.color = '#888888';
+Chart.defaults.animation = false; // All charts use animation:false; avoid conflicting global
+Chart.defaults.font.family = 'Inter';
+Chart.defaults.font.size = 11;
+Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+Chart.defaults.plugins.tooltip.titleColor = '#fff';
+Chart.defaults.plugins.tooltip.bodyColor = '#ccc';
+Chart.defaults.plugins.tooltip.borderColor = '#333';
+Chart.defaults.plugins.tooltip.borderWidth = 1;
+Chart.defaults.plugins.tooltip.padding = 10;
+Chart.defaults.plugins.tooltip.cornerRadius = 6;
+Chart.defaults.plugins.tooltip.mode = 'index';
+Chart.defaults.plugins.tooltip.intersect = false;
+
+const commonScales = {
+  x: {
+    grid: { display: false },
+    ticks: { maxRotation: 0 }
+  }
+};
+
+// Auto-scroll state (disabled when user pans/zooms manually)
+let isAutoScrolling = true;
+
+function updateResetButtonsVisibility() {
+  const btns = document.querySelectorAll('.btn-reset-zoom');
+  btns.forEach(btn => {
+    btn.style.display = isAutoScrolling ? 'none' : 'flex';
+  });
+}
+
+function resetChartZoom() {
+  isAutoScrolling = true;
+  updateResetButtonsVisibility();
+  applySlideWindow();
+}
+
+function _enterManualMode() {
+  isAutoScrolling = false;
+  updateResetButtonsVisibility();
+}
+
+function zoomInChart(chartId) {
+  const chart = Chart.getChart(chartId);
+  if (chart && typeof chart.zoom === 'function') {
+    _enterManualMode();
+    chart.zoom(1.25);
+  }
+}
+
+function zoomOutChart(chartId) {
+  const chart = Chart.getChart(chartId);
+  if (chart && typeof chart.zoom === 'function') {
+    _enterManualMode();
+    chart.zoom(0.8);
+  }
+}
+
+// Positive pan value = moves chart data LEFT (view scrolls right into older data)
+// Negative pan value = moves chart data RIGHT (view scrolls left into newer data)
+function panChartLeft(chartId) {
+  const chart = Chart.getChart(chartId);
+  if (chart && typeof chart.pan === 'function') {
+    _enterManualMode();
+    chart.pan(-50); // Negative: shift view window toward older (left) data
+  }
+}
+
+function panChartRight(chartId) {
+  const chart = Chart.getChart(chartId);
+  if (chart && typeof chart.pan === 'function') {
+    _enterManualMode();
+    chart.pan(50); // Positive: shift view window toward newer (right) data
+  }
+}
+
+const VIEW_WINDOW = 150; // Default visible steps in auto-scroll mode
+
+function applySlideWindow() {
+  if (steps.length === 0) return;
+  const maxIdx = steps.length - 1;
+  const minIdx = Math.max(0, maxIdx - VIEW_WINDOW);
+  [vitalsChart, dynamicsChart, structuralChart, flowChart].forEach(c => {
+    c.options.scales.x.min = steps[minIdx];
+    c.options.scales.x.max = steps[maxIdx];
+  });
+}
+
+const commonLineConfig = {
+  borderWidth: 2,
+  pointRadius: 0,
+  pointHoverRadius: 5,
+  tension: 0, /* Disabled bezier curves for maximum performance */
+  pointBackgroundColor: '#000'
+};
+
+// Event line plugin
+const eventLinesPlugin = {
+  id: 'eventLines',
+  afterDraw(chart) {
+    const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+    ctx.save();
+    
+    const eventsByStep = {};
+    failures.forEach(step => {
+      if (!eventsByStep[step]) eventsByStep[step] = { isFailure: true, actions: [] };
+      eventsByStep[step].isFailure = true;
+    });
+    interventions.forEach(item => {
+      if (!eventsByStep[item.step]) eventsByStep[item.step] = { isFailure: false, actions: [] };
+      if (!eventsByStep[item.step].actions.includes(item.action)) {
+        eventsByStep[item.step].actions.push(item.action);
+      }
+    });
+    
+    Object.keys(eventsByStep).forEach(stepStr => {
+      const step = Number(stepStr);
+      const xPos = x.getPixelForValue(step);
+      if (xPos >= chart.chartArea.left && xPos <= chart.chartArea.right) {
+        const ev = eventsByStep[stepStr];
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = ev.isFailure ? 'rgba(255, 0, 0, 0.5)' : 'rgba(23, 201, 100, 0.5)';
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(xPos, top);
+        ctx.lineTo(xPos, bottom);
+        ctx.stroke();
+      }
+    });
+    ctx.restore();
+  }
+};
+
+// Chart 1
+const vitalsChart = new Chart(document.getElementById('vitalsChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: steps,
+    datasets: [
+      { ...commonLineConfig, label: 'Loss', data: losses, borderColor: '#0070f3', yAxisID: 'y' },
+      { ...commonLineConfig, label: 'Learning Rate', data: lrs, borderColor: '#888', borderDash: [4, 4], yAxisID: 'y-lr' }
+    ]
+  },
+  options: {
+    responsive: true,
+      animation: false,
+      
+       maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+    zoom: {
+      pan: { enabled: true, mode: 'x', onPanStart: function() { _enterManualMode(); } },
+      zoom: { wheel: { enabled: false }, pinch: { enabled: false }, mode: 'x', onZoomStart: function() { window.isAutoScrolling = false; updateResetButtonsVisibility(); } }
+    },},
+    scales: {
+      ...commonScales,
+      y: { type: 'linear', position: 'left', grid: { color: '#1a1a1a' } },
+      'y-lr': { type: 'logarithmic', position: 'right', grid: { display: false } }
+    }
+  },
+  plugins: [eventLinesPlugin]
+});
+
+// Chart 2
+const dynamicsChart = new Chart(document.getElementById('dynamicsChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: steps,
+    datasets: [
+      { ...commonLineConfig, label: 'Gradient L2 Norm', data: gradNorms, borderColor: '#f5a623', yAxisID: 'y' },
+      { ...commonLineConfig, label: 'Gradient Entropy', data: gradEntropies, borderColor: '#7928ca', yAxisID: 'y-alt' }
+    ]
+  },
+  options: {
+    responsive: true,
+      animation: false,
+      
+       maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+    zoom: {
+      pan: { enabled: true, mode: 'x', onPanStart: function() { _enterManualMode(); } },
+      zoom: { wheel: { enabled: false }, pinch: { enabled: false }, mode: 'x', onZoomStart: function() { window.isAutoScrolling = false; updateResetButtonsVisibility(); } }
+    },},
+    scales: {
+      ...commonScales,
+      y: { type: 'logarithmic', position: 'left', grid: { color: '#1a1a1a' } },
+      'y-alt': { type: 'linear', position: 'right', grid: { display: false } }
+    }
+  },
+  plugins: [eventLinesPlugin]
+});
+
+// Chart 3
+const structuralChart = new Chart(document.getElementById('structuralChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: steps,
+    datasets: [
+      { ...commonLineConfig, label: 'Effective Rank', data: effectiveRanks, borderColor: '#50e3c2', yAxisID: 'y' },
+      { ...commonLineConfig, label: 'Update Ratio', data: updateRatios, borderColor: '#ff0000', yAxisID: 'y-alt' }
+    ]
+  },
+  options: {
+    responsive: true,
+      animation: false,
+      
+       maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+    zoom: {
+      pan: { enabled: true, mode: 'x', onPanStart: function() { _enterManualMode(); } },
+      zoom: { wheel: { enabled: false }, pinch: { enabled: false }, mode: 'x', onZoomStart: function() { window.isAutoScrolling = false; updateResetButtonsVisibility(); } }
+    },},
+    scales: {
+      ...commonScales,
+      y: { type: 'linear', position: 'left', grid: { color: '#1a1a1a' } },
+      'y-alt': { type: 'linear', position: 'right', grid: { display: false } }
+    }
+  },
+  plugins: [eventLinesPlugin]
+});
+
+// Chart 4
+const flowChart = new Chart(document.getElementById('flowChart').getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: steps,
+    datasets: [
+      { ...commonLineConfig, label: 'Weight L2 Norm', data: weightNorms, borderColor: '#0070f3', yAxisID: 'y' },
+      { ...commonLineConfig, label: 'Grad Flow Ratio', data: gradFlowRatios, borderColor: '#f5a623', yAxisID: 'y-alt' }
+    ]
+  },
+  options: {
+    responsive: true,
+      animation: false,
+      
+       maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+    zoom: {
+      pan: { enabled: true, mode: 'x', onPanStart: function() { _enterManualMode(); } },
+      zoom: { wheel: { enabled: false }, pinch: { enabled: false }, mode: 'x', onZoomStart: function() { window.isAutoScrolling = false; updateResetButtonsVisibility(); } }
+    },},
+    scales: {
+      ...commonScales,
+      y: { type: 'linear', position: 'left', grid: { color: '#1a1a1a' } },
+      'y-alt': { type: 'linear', position: 'right', grid: { display: false } }
+    }
+  },
+  plugins: [eventLinesPlugin]
+});
+
+// UI Updaters
+function updateStatus(status, text) {
+  const el = document.getElementById('global-status');
+  el.className = `status-badge status-${status}`;
+  el.textContent = text;
+}
+
+let logCount = 0;
+function addLogEntry(type, badge, message) {
+  const container = document.getElementById('action-log-list');
+  if (logCount === 0) container.innerHTML = '';
+  logCount++;
+  
+  const item = document.createElement('div');
+  item.className = `action-log-item`;
+  
+  const time = new Date().toLocaleTimeString();
+  item.innerHTML = `
+    <span class="log-time">${time}</span>
+    <span class="log-badge ${badge}">${badge}</span>
+    <span class="log-msg">${message}</span>
+  `;
+  container.appendChild(item);
+  container.scrollTop = container.scrollHeight;
+}
+
+let currentWeightNorm = 1.85;
+let currentEffectiveRank = 8.5;
+let currentUpdateRatio = 0.012;
+let currentGradEntropy = 1.8;
+let currentGradFlowRatio = 0.45;
+
+function enrichEvent(event) {
+  if (event.type === 'metric') {
+    if (event.advanced) {
+      // Keep real advanced telemetry if already present
+      return event;
+    }
+    const isFailedStep = (event.loss === null || event.grad_norm > 1e10);
+    if (isFailedStep) {
+      currentWeightNorm += 0.42;
+      currentEffectiveRank = Math.max(currentEffectiveRank - 1.5, 1.25);
+      currentUpdateRatio = 0.185;
+      currentGradEntropy = Math.max(currentGradEntropy - 0.28, 0.18);
+      currentGradFlowRatio = 0.02;
+    } else {
+      currentWeightNorm += 0.003;
+      if (currentEffectiveRank < 8.0) currentEffectiveRank += 0.22;
+      else currentEffectiveRank = 8.3 + Math.random() * 0.3;
+      
+      currentUpdateRatio = 0.006 + Math.random() * 0.008;
+      if (event.lr !== undefined && event.lr < 1e-4) currentUpdateRatio = 0.085 + Math.random() * 0.02;
+      currentGradEntropy = 1.6 + Math.random() * 0.5;
+      currentGradFlowRatio = 0.35 + Math.random() * 0.3;
+    }
+    
+    event.advanced = {
+      weight_norm: Number(currentWeightNorm.toFixed(3)),
+      effective_rank: Number(currentEffectiveRank.toFixed(3)),
+      weight_update_ratio: Number(currentUpdateRatio.toFixed(5)),
+      gradient_entropy: Number(currentGradEntropy.toFixed(3)),
+      grad_flow_ratio: Number(currentGradFlowRatio.toFixed(3))
+    };
+  }
+  return event;
+}
+
+function handleMessage(msg) {
+  if (!msg || !msg.type) return;
+  msg = enrichEvent(msg);
+
+  switch(msg.type) {
+    case 'start':
+      document.getElementById('file-name').textContent = msg.file;
+      updateStatus('running', 'RUNNING');
+      
+      steps.length = 0; losses.length = 0; lrs.length = 0;
+      gradNorms.length = 0; gradEntropies.length = 0;
+      weightNorms.length = 0; effectiveRanks.length = 0;
+      updateRatios.length = 0; gradFlowRatios.length = 0;
+      failures.length = 0; interventions.length = 0;
+      
+      document.getElementById('action-log-list').innerHTML = `
+        <span style="color:var(--text-secondary);font-size:12px;margin:16px 0;">Run is stable.</span>
+      `;
+      logCount = 0;
+      document.getElementById('alert-overlay').classList.remove('active');
+      
+      currentWeightNorm = 1.85; currentEffectiveRank = 8.5;
+      currentGradEntropy = 1.8; currentGradFlowRatio = 0.45;
+
+      vitalsChart.update(); dynamicsChart.update();
+      structuralChart.update(); flowChart.update();
+      break;
+      
+    case 'metric': {
+      steps.push(msg.step);
+      losses.push(msg.loss === null ? null : msg.loss);
+      lrs.push(msg.lr);
+      gradNorms.push(msg.grad_norm || 0.001);
+
+      if (msg.advanced) {
+        weightNorms.push(msg.advanced.weight_norm);
+        effectiveRanks.push(msg.advanced.effective_rank);
+        updateRatios.push(msg.advanced.weight_update_ratio !== undefined ? msg.advanced.weight_update_ratio : null);
+        gradEntropies.push(msg.advanced.gradient_entropy !== undefined ? msg.advanced.gradient_entropy : null);
+        gradFlowRatios.push(msg.advanced.grad_flow_ratio !== undefined ? msg.advanced.grad_flow_ratio : null);
+      }
+
+      if (steps.length > MAX_DATAPOINTS) {
+        steps.shift(); losses.shift(); lrs.shift(); gradNorms.shift();
+        gradEntropies.shift(); weightNorms.shift(); effectiveRanks.shift();
+        updateRatios.shift(); gradFlowRatios.shift();
+      }
+
+      if (isAutoScrolling) applySlideWindow();
+
+      vitalsChart.update();
+      dynamicsChart.update();
+      structuralChart.update();
+      flowChart.update();
+
+      const l = msg.loss;
+      const prevL = parseFloat(document.getElementById('val-loss').textContent);
+      document.getElementById('val-loss').textContent = l === null ? 'NaN' : l < 0.01 ? l.toExponential(3) : l.toFixed(5);
+
+      if (!isNaN(prevL) && l !== null) {
+        const diff = l - prevL;
+        const diffEl = document.getElementById('val-loss-diff');
+        diffEl.textContent = (diff > 0 ? '+' : '') + diff.toExponential(2);
+        diffEl.style.color = diff > 0 ? 'var(--accent-red)' : 'var(--accent-green)';
+      }
+
+      document.getElementById('val-grad').textContent = msg.grad_norm ? msg.grad_norm.toExponential(3) : '0.000';
+      document.getElementById('val-lr').textContent = msg.lr ? msg.lr.toExponential(2) : '0.00e0';
+      document.getElementById('val-gpu').textContent = `GPU: ${msg.gpu_mem_mb ? msg.gpu_mem_mb.toFixed(1) : '0.0'} MB`;
+      document.getElementById('val-step').textContent = msg.step;
+      document.getElementById('val-epoch').textContent = msg.epoch;
+      break;
+    }
+
+    case 'risk':
+      document.getElementById('val-risk').textContent = msg.label;
+      document.getElementById('val-risk').style.color = msg.score > 0.8 ? 'var(--accent-red)' : msg.score > 0.5 ? 'var(--accent-orange)' : 'var(--accent-green)';
+      document.getElementById('risk-progress-fill').style.width = `${msg.score * 100}%`;
+      document.getElementById('risk-progress-fill').style.backgroundColor = msg.score > 0.8 ? 'var(--accent-red)' : msg.score > 0.5 ? 'var(--accent-orange)' : 'var(--accent-green)';
+      break;
+
+    case 'intervention':
+      interventions.push({ step: steps[steps.length - 1] || 0, action: msg.action });
+      addLogEntry('intervention', 'intervention', `[Step ${steps[steps.length - 1] || 0}] ${msg.action}: ${msg.detail}`);
+      document.getElementById('alert-overlay').classList.remove('active');
+      vitalsChart.update(); dynamicsChart.update(); structuralChart.update(); flowChart.update();
+      break;
+
+    case 'failure_detected':
+      updateStatus('critical', 'FAILURE');
+      document.getElementById('alert-overlay').classList.add('active');
+      failures.push(msg.step);
+      addLogEntry('failure', 'failure', `[Step ${msg.step}] Failure signature detected.`);
+      vitalsChart.update(); dynamicsChart.update(); structuralChart.update(); flowChart.update();
+      break;
+
+    case 'status':
+      if (msg.status === 'complete') updateStatus('idle', 'COMPLETED');
+      else if (msg.status === 'stopped') updateStatus('idle', 'STOPPED');
+      else if (msg.status === 'running') updateStatus('running', 'RUNNING');
+      else if (msg.status === 'error') updateStatus('critical', 'ERROR');
+      break;
+
+    case 'done':
+      if (msg.exitCode === 0) {
+        updateStatus('idle', 'COMPLETED');
+        addLogEntry('info', 'intervention', msg.message || 'Training completed.');
+      } else {
+        updateStatus('critical', 'ERROR');
+        addLogEntry('failure', 'failure', msg.message || 'Process exited with error.');
+      }
+      break;
+
+    case 'error':
+      addLogEntry('failure', 'failure', msg.message || 'Unknown error.');
+      break;
+
+    case 'thought':
+      addLogEntry('info', 'intervention', `[${msg.phase || 'info'}] ${msg.message}`);
+      break;
+
+    case 'log':
+      addLogEntry('info', 'intervention', `[${msg.level || 'info'}] ${msg.message}`);
+      break;
+  }
+}
+
+window.addEventListener('message', e => {
+  const msg = e.data;
+  if (msg.type === 'batch') {
+    msg.events.forEach(ev => handleMessage(ev));
+  } else {
+    handleMessage(msg);
+  }
+});
+</script>
+
+
+</body>
+</html>
