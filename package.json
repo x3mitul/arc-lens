@@ -1,7 +1,7 @@
 {
   "name": "arc-lens",
-  "displayName": "ARC Lens - Self-Healing ML Trainer",
-  "description": "Interactive dashboard and autonomous recovery agent for PyTorch training, built for the ARC (Autonomous Recovery Controller) ecosystem.",
+  "displayName": "ARC Lens - Resilient ML Trainer",
+  "description": "Interactive dashboard and automated recovery controller for PyTorch training, built for the ARC ecosystem.",
   "version": "0.1.0",
   "publisher": "arclens",
   "repository": {
@@ -12,7 +12,7 @@
   "bugs": {
     "url": "https://github.com/x3mitul/arc-lens/issues"
   },
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "icon": "media/logo.png",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Machine Learning", "Visualization", "Debuggers"],
@@ -34,6 +34,16 @@
         "title": "⏹ Stop ARC Lens",
         "category": "ARC Lens",
         "icon": "$(debug-stop)"
+      },
+      {
+        "command": "arc-lens.openChat",
+        "title": "Open AI Failure Analyst",
+        "category": "ARC Lens Pro"
+      },
+      {
+        "command": "arc-lens.generateScript",
+        "title": "Generate ARC-Tested Script",
+        "category": "ARC Lens Pro"
       }
     ],
     "menus": {
@@ -57,6 +67,21 @@
           "type": "number",
           "default": 0.02,
           "description": "Artificial delay (in seconds) introduced after each training step to pace visualization. Default is 0.02s."
+        },
+        "arcAgent.licenseKey": {
+          "type": "string",
+          "default": "",
+          "description": "ARC Lens Pro license key. Get yours at https://arc-lens.dev/pro"
+        },
+        "arcAgent.openRouterKey": {
+          "type": "string",
+          "default": "",
+          "description": "[Pro] Your OpenRouter API key (sk-or-...). Used for AI Failure Analyst and Script Generator."
+        },
+        "arcAgent.llmModel": {
+          "type": "string",
+          "default": "google/gemini-2.5-flash:free",
+          "description": "[Pro] OpenRouter model string to use for AI features."
         }
       }
     }
@@ -64,7 +89,9 @@
   "scripts": {
     "vscode:prepublish": "npm run compile && node scripts/embed_python.js",
     "compile": "tsc -p ./ && node scripts/embed_python.js",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "dev:enable": "node scripts/dev_enable.js",
+    "dev:disable": "node scripts/dev_disable.js"
   },
   "devDependencies": {
     "@types/vscode": "^1.85.0",

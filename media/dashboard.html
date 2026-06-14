@@ -63,12 +63,15 @@ header {
   position: sticky;
   top: 0;
   display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 32px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--panel-border);
   background: var(--header-bg);
-  backdrop-filter: saturate(180%) blur(10px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   z-index: 1000;
 }
 
@@ -85,10 +88,66 @@ header {
   color: var(--text-primary);
 }
 
+.pro-badge {
+  background: transparent;
+  border: 1px solid #333333;
+  color: #a1a1aa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+}
+
+.pro-btn {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  white-space: nowrap;
+  height: 26px;
+}
+.pro-btn svg {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+.pro-btn-gradient {
+  background: #ededed;
+  border: 1px solid #ededed;
+  color: #000000;
+  font-weight: 500;
+}
+.pro-btn-gradient:hover {
+  background: #ffffff;
+}
+.pro-btn-outline {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--panel-border);
+  color: var(--text-primary);
+}
+.pro-btn-outline:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
 .header-controls {
   display: flex;
   align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .file-badge {
@@ -337,8 +396,23 @@ header {
   <div class="logo-container">
     <img src="{{LOGO_URI}}" alt="ARC Lens Logo" style="height: 24px; width: 24px; border-radius: 4px; object-fit: cover;">
     <span class="logo-text">ARC Lens</span>
+    <span id="pro-badge" class="pro-badge" style="display: none;">PRO</span>
   </div>
   <div class="header-controls">
+    <div id="pro-actions-container" style="display: flex; gap: 8px; align-items: center;">
+      <button id="pro-upgrade-btn" class="pro-btn pro-btn-gradient" style="display: none;" onclick="upgradePro()">
+        <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+        Go Pro
+      </button>
+      <button id="pro-chat-btn" class="pro-btn pro-btn-outline" style="display: none;" onclick="openProChat()">
+        <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+        AI Failure Analyst
+      </button>
+      <button id="pro-gen-btn" class="pro-btn pro-btn-outline" style="display: none;" onclick="openProGen()">
+        <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+        Script Generator
+      </button>
+    </div>
     <button id="theme-toggle" class="btn-theme" onclick="toggleTheme()" title="Toggle Light/Dark Mode" style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></button>
     <span class="file-badge" id="file-name">Not running</span>
     <div class="status-badge status-idle" id="global-status">IDLE</div>
@@ -436,6 +510,38 @@ header {
 
 <script>
 const vscode = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null;
+const IS_PRO_INITIAL = typeof acquireVsCodeApi === 'function' ? {{IS_PRO_PLACEHOLDER}} : true;
+
+function upgradePro() {
+  if (vscode) {
+    vscode.postMessage({ command: 'upgrade' });
+  }
+}
+function openProChat() {
+  if (vscode) {
+    vscode.postMessage({ command: 'openChat' });
+  }
+}
+function openProGen() {
+  if (vscode) {
+    vscode.postMessage({ command: 'openGenerator' });
+  }
+}
+
+function initProState() {
+  if (IS_PRO_INITIAL) {
+    document.getElementById('pro-badge').style.display = 'inline-flex';
+    document.getElementById('pro-upgrade-btn').style.display = 'none';
+    document.getElementById('pro-chat-btn').style.display = 'inline-flex';
+    document.getElementById('pro-gen-btn').style.display = 'inline-flex';
+  } else {
+    document.getElementById('pro-badge').style.display = 'none';
+    document.getElementById('pro-upgrade-btn').style.display = 'inline-flex';
+    document.getElementById('pro-chat-btn').style.display = 'none';
+    document.getElementById('pro-gen-btn').style.display = 'none';
+  }
+}
+initProState();
 
 // Telemetry History
 const MAX_DATAPOINTS = 100000;
@@ -554,6 +660,31 @@ Chart.defaults.plugins.tooltip.padding = 10;
 Chart.defaults.plugins.tooltip.cornerRadius = 6;
 Chart.defaults.plugins.tooltip.mode = 'index';
 Chart.defaults.plugins.tooltip.intersect = false;
+Chart.defaults.plugins.tooltip.callbacks = {
+  label: function(context) {
+    let label = context.dataset.label || '';
+    if (label) {
+      label += ': ';
+    }
+    if (context.parsed.y !== null) {
+      let val = context.parsed.y;
+      if (val === 0) {
+        label += '0';
+      } else if (Math.abs(val) >= 10000 || Math.abs(val) <= 0.001) {
+        label += val.toExponential(2);
+      } else {
+        label += val.toLocaleString(undefined, { maximumFractionDigits: 4 });
+      }
+    }
+    return label;
+  }
+};
+
+const tickFormatter = function(value) {
+  if (value === 0) return '0';
+  if (Math.abs(value) >= 10000 || Math.abs(value) <= 0.001) return value.toExponential(2);
+  return value.toLocaleString();
+};
 
 const commonScales = {
   x: {
@@ -656,13 +787,17 @@ const eventLinesPlugin = {
       }
     });
     
-    Object.keys(eventsByStep).forEach(stepStr => {
+    let lastX = -999;
+    Object.keys(eventsByStep).sort((a, b) => Number(a) - Number(b)).forEach(stepStr => {
       const step = Number(stepStr);
       const xPos = x.getPixelForValue(step);
       if (xPos >= chart.chartArea.left && xPos <= chart.chartArea.right) {
+        if (xPos - lastX < 6) return; // Prevent dense clustering of intervention lines
+        lastX = xPos;
+
         const ev = eventsByStep[stepStr];
         ctx.lineWidth = 1;
-        ctx.strokeStyle = ev.isFailure ? 'rgba(255, 0, 0, 0.5)' : 'rgba(23, 201, 100, 0.5)';
+        ctx.strokeStyle = ev.isFailure ? 'rgba(255, 0, 0, 0.25)' : 'rgba(23, 201, 100, 0.25)';
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
         ctx.moveTo(xPos, top);
@@ -697,8 +832,8 @@ const vitalsChart = new Chart(document.getElementById('vitalsChart').getContext(
     },},
     scales: {
       ...commonScales,
-      y: { type: 'linear', position: 'left', grid: { color: '#1a1a1a' } },
-      'y-lr': { type: 'logarithmic', position: 'right', grid: { display: false } }
+      y: { type: 'linear', position: 'left', grid: { color: '#1a1a1a' }, ticks: { callback: tickFormatter } },
+      'y-lr': { type: 'logarithmic', position: 'right', grid: { display: false }, ticks: { callback: tickFormatter } }
     }
   },
   plugins: [eventLinesPlugin]
@@ -727,8 +862,8 @@ const dynamicsChart = new Chart(document.getElementById('dynamicsChart').getCont
     },},
     scales: {
       ...commonScales,
-      y: { type: 'logarithmic', position: 'left', grid: { color: '#1a1a1a' } },
-      'y-alt': { type: 'linear', position: 'right', grid: { display: false } }
+      y: { type: 'logarithmic', position: 'left', grid: { color: '#1a1a1a' }, ticks: { callback: tickFormatter } },
+      'y-alt': { type: 'linear', position: 'right', grid: { display: false }, ticks: { callback: tickFormatter } }
     }
   },
   plugins: [eventLinesPlugin]
@@ -813,9 +948,12 @@ function addLogEntry(type, badge, message) {
   const time = new Date().toLocaleTimeString();
   item.innerHTML = `
     <span class="log-time">${time}</span>
-    <span class="log-badge ${badge}">${badge}</span>
-    <span class="log-msg">${message}</span>
+    <span class="log-badge"></span>
+    <span class="log-msg"></span>
   `;
+  item.querySelector('.log-badge').className = 'log-badge ' + badge;
+  item.querySelector('.log-badge').textContent = badge;
+  item.querySelector('.log-msg').textContent = message;
   container.appendChild(item);
   container.scrollTop = container.scrollHeight;
 }
@@ -887,6 +1025,18 @@ function handleMessage(msg) {
 
       vitalsChart.update(); dynamicsChart.update();
       structuralChart.update(); flowChart.update();
+
+      if (msg.isPro) {
+        document.getElementById('pro-badge').style.display = 'inline-flex';
+        document.getElementById('pro-upgrade-btn').style.display = 'none';
+        document.getElementById('pro-chat-btn').style.display = 'inline-flex';
+        document.getElementById('pro-gen-btn').style.display = 'inline-flex';
+      } else {
+        document.getElementById('pro-badge').style.display = 'none';
+        document.getElementById('pro-upgrade-btn').style.display = 'inline-flex';
+        document.getElementById('pro-chat-btn').style.display = 'none';
+        document.getElementById('pro-gen-btn').style.display = 'none';
+      }
       break;
       
     case 'metric': {
@@ -911,10 +1061,7 @@ function handleMessage(msg) {
 
       if (isAutoScrolling) applySlideWindow();
 
-      vitalsChart.update();
-      dynamicsChart.update();
-      structuralChart.update();
-      flowChart.update();
+      window.chartsNeedUpdate = true;
 
       const l = msg.loss;
       const prevL = parseFloat(document.getElementById('val-loss').textContent);
@@ -946,7 +1093,7 @@ function handleMessage(msg) {
       interventions.push({ step: steps[steps.length - 1] || 0, action: msg.action });
       addLogEntry('intervention', 'intervention', `[Step ${steps[steps.length - 1] || 0}] ${msg.action}: ${msg.detail}`);
       document.getElementById('alert-overlay').classList.remove('active');
-      vitalsChart.update(); dynamicsChart.update(); structuralChart.update(); flowChart.update();
+      window.chartsNeedUpdate = true;
       break;
 
     case 'failure_detected':
@@ -954,7 +1101,7 @@ function handleMessage(msg) {
       document.getElementById('alert-overlay').classList.add('active');
       failures.push(msg.step);
       addLogEntry('failure', 'failure', `[Step ${msg.step}] Failure signature detected.`);
-      vitalsChart.update(); dynamicsChart.update(); structuralChart.update(); flowChart.update();
+      window.chartsNeedUpdate = true;
       break;
 
     case 'status':
@@ -996,6 +1143,18 @@ window.addEventListener('message', e => {
     handleMessage(msg);
   }
 });
+
+// Decoupled render loop to prevent UI lag on rapid metrics
+window.chartsNeedUpdate = false;
+setInterval(() => {
+  if (window.chartsNeedUpdate) {
+    if (typeof vitalsChart !== 'undefined') vitalsChart.update('none');
+    if (typeof dynamicsChart !== 'undefined') dynamicsChart.update('none');
+    if (typeof structuralChart !== 'undefined') structuralChart.update('none');
+    if (typeof flowChart !== 'undefined') flowChart.update('none');
+    window.chartsNeedUpdate = false;
+  }
+}, 100);
 </script>
 
 

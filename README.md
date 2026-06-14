@@ -1,18 +1,73 @@
 # ARC Lens
 
-**ARC Lens** is a real-time training visualization dashboard and metrics tracker extension for PyTorch. It helps visualize training losses, learning rates, gradient norms, and GPU memory usage.
+ARC Lens is a real-time training visualization dashboard, telemetry collector, and automated recovery extension for PyTorch inside VS Code. It automatically monitors and corrects training run pathologies (such as exploding gradients or numerical divergence) using a local reasoning engine.
 
-## Features
+## Architecture
 
-* **Real-Time PyTorch Monitoring**: Visualizes losses, learning rates, gradient norms, and GPU memory usage side-by-side.
-* **Interactive Charts**: Smooth interactive charts with mouse drag-to-pan, scroll-to-zoom, and auto-scroll pausing.
-* **Environment Verification**: Detects if training components are available in the active Python environment.
+The extension uses a decoupled three-tier architecture to monitor and recover training loops with zero user-side code modification:
 
-## Getting Started
+1. **VS Code Extension**: Manages the host processes, communication channels, dashboard webviews, and AI failure diagnostics.
+2. **Telemetry Engine**: Runs inside the user's execution context. It utilizes the `arc-training` package to hook into PyTorch execution and stream step telemetry (loss, learning rates, gradient norms, and GPU memory usage) in real time.
+3. **Local Reasoning Loop**: Implements a local offline agent. When step metrics exceed safety thresholds (e.g., NaN loss or exploding gradients), the loop pauses execution and applies recovery tools, such as restoring weights from a previous healthy checkpoint and scaling down learning rates.
 
-1. Open a Python (.py) training script in VS Code.
-2. Click the **Run with ARC Lens** button in the top-right toolbar.
+## Telemetry Metrics
+
+ARC Lens tracks a variety of optimization metrics to diagnose training failure modes:
+
+### Core Metrics
+* **Loss**: Tracks optimization objective progression.
+* **Learning Rate**: Intercepts optimizer parameter groups in real time.
+* **Gradient L2 Norm**: Monitors optimization step magnitude to detect potential divergence.
+* **GPU Memory**: Tracks allocated and reserved VRAM to warn of Out-Of-Memory (OOM) conditions.
+
+### Advanced Diagnostics
+* **Effective Rank**: Estimates layer representation collapse or dimensional reduction.
+* **Gradient Entropy**: Measures gradient noise distribution to identify flat minima.
+* **Weight Update Ratio**: Compares update step magnitude against weight norms ($||\Delta W|| / ||W||$).
+* **Gradient Flow Ratio**: Computes the gradient ratio between early and deep layers to monitor vanishing gradient trends.
+
+## Automated Interventions
+
+When training anomalies are detected, the local agent can perform targeted recovery operations:
+* `rollback_and_reduce_lr`: Reverts model weights to the last known healthy checkpoint and scales down the learning rate.
+* `reduce_lr`: Adapts learning rates mid-run to stabilize optimization.
+* `enable_grad_clipping`: Recommends gradient clipping thresholds when gradient norms exceed safety limits.
+
+## Configuration
+
+Configure ARC Lens settings in VS Code (`ctrl+,` / `cmd+,`):
+
+| Setting | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `arcAgent.pythonPath` | `string` | `"python"` | Path to the Python interpreter (e.g., virtual environment binary). |
+| `arcAgent.stepDelay` | `number` | `0.02` | Pause duration (in seconds) introduced after each step to pace visualization. |
+| `arcAgent.licenseKey` | `string` | `""` | ARC Lens Pro license key. Unlocked by default in evaluation mode. |
+| `arcAgent.openRouterKey` | `string` | `""` | OpenRouter API key (`sk-or-...`) used for AI diagnostics features. |
+| `arcAgent.llmModel` | `string` | `"google/gemini-2.5-flash:free"` | LLM model identifier used for analysis. |
+
+## Evaluation (Simulation Mode)
+
+This repository is pre-configured to build and run in a standalone **Simulation Mode** for evaluation and demonstration. In this mode, the extension executes a simulated training loop that showcases real-time chart updates, failure detection, and automatic intervention logs without requiring PyTorch, CUDA, or local machine learning packages.
+
+For real-world usage on actual training scripts, please install the official [ARC Lens VS Code Extension](https://marketplace.visualstudio.com/items?itemName=arclens.arc-lens) (which performs actual PyTorch hook injection and active weight recovery) and refer to the [ARC Framework Documentation](https://pyarc.pages.dev/).
+
+To run the local evaluation:
+
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+2. **Compile the Extension**:
+   ```bash
+   npm run compile
+   ```
+3. **Launch the Extension**:
+   Press `F5` to open the VS Code **Extension Development Host**.
+4. **Run the Demo**:
+   * Open any Python (`.py`) file in the new host window.
+   * Click the **Run with ARC Lens** button in the top-right editor toolbar.
+   * The dashboard will open, simulating a real-time training loop that hits a NaN loss at step 20, runs a diagnostic reasoning loop, executes a weight rollback, and recovers successfully.
 
 ## License
 
-This extension is licensed under the MIT License.
+This extension is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
