@@ -10,6 +10,28 @@ The extension uses a decoupled three-tier architecture to monitor and recover tr
 2. **Telemetry Engine**: Runs inside the user's execution context. It utilizes the `arc-training` package to hook into PyTorch execution and stream step telemetry (loss, learning rates, gradient norms, and GPU memory usage) in real time.
 3. **Local Reasoning Loop**: Implements a local offline agent. When step metrics exceed safety thresholds (e.g., NaN loss or exploding gradients), the loop pauses execution and applies recovery tools, such as restoring weights from a previous healthy checkpoint and scaling down learning rates.
 
+## How It Works (Production Workflow)
+
+In production environments, the system automates telemetry extraction and recovery through the following workflow:
+
+1. **Environment Setup**:
+   Ensure the Python dependencies are installed in your active virtual environment:
+   ```bash
+   pip install torch arc-training
+   ```
+
+2. **Zero-Code Instrumentation**:
+   When you click the **Run with ARC Lens** button in the editor toolbar, the extension runs your PyTorch script via a launcher. This launcher dynamically hooks into the PyTorch training loop to stream step-by-step telemetry (e.g., loss, learning rates, gradient norms) to the extension.
+
+3. **Dashboard Monitoring**:
+   Metrics are streamed live to the VS Code dashboard webview, rendering interactive plots of core and advanced diagnostics (Representation Rank, Gradient Entropy, etc.).
+
+4. **Autonomic Recovery**:
+   When a step metric crosses safety thresholds, the local reasoning loop intercepts execution:
+   * **State Rollback**: It automatically rolls back model weights to the last known healthy checkpoint stored in GPU memory.
+   * **Parameter Adaptation**: It adjusts learning rate schedules or activates gradient clipping to bypass the pathology.
+   * **Resumed Execution**: Once corrected, training continues smoothly without user intervention.
+
 ## Telemetry Metrics
 
 ARC Lens tracks a variety of optimization metrics to diagnose training failure modes:
