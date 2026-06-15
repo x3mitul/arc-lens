@@ -1,6 +1,6 @@
 # ARC Lens
 
-ARC Lens is a real-time training visualization dashboard, telemetry collector, and automated recovery extension for PyTorch inside VS Code. It automatically monitors and corrects training run pathologies (such as exploding gradients or numerical divergence) using a local reasoning engine.
+ARC Lens is a real-time training visualization dashboard, telemetry collector, and automated recovery extension for PyTorch inside VS Code. Designed as the visualization and interactive control center for the **ARC (Autonomic Recovery Controller)** ecosystem, it automatically monitors, analyzes, and recovers training runs from optimization pathologies (such as NaN loss, exploding gradients, or representational collapse) using a local agent-guided reasoning loop.
 
 ## Architecture
 
