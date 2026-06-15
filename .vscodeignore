@@ -12,4 +12,7 @@ PUBLISHING.md
 **/__pycache__/**
 **/*.pyc
 python/**
-context.md\narc_lens_business_plan.md
+context.md
+arc_lens_business_plan.md
+ARC_FUNDING_PROPOSAL.md
+private_backup/**

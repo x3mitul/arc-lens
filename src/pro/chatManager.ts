@@ -24,40 +24,91 @@ export function streamChatCompletion(
   const apiKey = getOpenRouterKey();
   if (!apiKey) {
     onError(
-      "No OpenRouter API key configured. Please set arcAgent.openRouterKey in VS Code settings."
+      "No API key configured. Please set arcAgent.openRouterKey in VS Code settings."
     );
     onDone();
     return () => {};
   }
 
   const isGroq = apiKey.startsWith("gsk_") || apiKey.includes("groq");
-  const hostname = isGroq ? "api.groq.com" : OPENROUTER_HOST;
-  const path = isGroq ? "/openai/v1/chat/completions" : OPENROUTER_PATH;
+  const isAnthropic = apiKey.startsWith("sk-ant-") || apiKey.includes("anthropic");
+  const isGemini = apiKey.startsWith("AIzaSy") || apiKey.includes("gemini") || apiKey.includes("google");
+  const isOpenAI = (apiKey.startsWith("sk-") && !apiKey.startsWith("sk-or-") && !apiKey.startsWith("sk-ant-")) || apiKey.includes("openai");
 
+  let hostname = OPENROUTER_HOST;
+  let path = OPENROUTER_PATH;
   let model = getLLMModel();
-  if (isGroq && (model.includes("gemini") || model.includes("deepseek"))) {
-    model = "llama-3.3-70b-versatile";
+  let headers: { [key: string]: string } = {
+    "Content-Type": "application/json"
+  };
+
+  if (isGroq) {
+    hostname = "api.groq.com";
+    path = "/openai/v1/chat/completions";
+    headers["Authorization"] = `Bearer ${apiKey}`;
+    if (!model.includes("llama") && !model.includes("mixtral")) {
+      model = "llama-3.3-70b-versatile";
+    }
+  } else if (isAnthropic) {
+    hostname = "api.anthropic.com";
+    path = "/v1/messages";
+    headers["x-api-key"] = apiKey;
+    headers["anthropic-version"] = "2023-06-01";
+    if (!model.includes("claude")) {
+      model = "claude-3-5-sonnet-20241022";
+    }
+  } else if (isGemini) {
+    hostname = "generativelanguage.googleapis.com";
+    path = "/v1beta/openai/chat/completions";
+    headers["Authorization"] = `Bearer ${apiKey}`;
+    if (!model.includes("gemini")) {
+      model = "gemini-1.5-flash";
+    }
+  } else if (isOpenAI) {
+    hostname = "api.openai.com";
+    path = "/v1/chat/completions";
+    headers["Authorization"] = `Bearer ${apiKey}`;
+    if (!model.startsWith("gpt-")) {
+      model = "gpt-4o-mini";
+    }
+  } else {
+    // OpenRouter (default)
+    hostname = OPENROUTER_HOST;
+    path = OPENROUTER_PATH;
+    headers["Authorization"] = `Bearer ${apiKey}`;
+    headers["HTTP-Referer"] = "https://arc-lens.dev";
+    headers["X-Title"] = "ARC Lens Pro";
   }
 
-  const body = JSON.stringify({
-    model,
-    messages,
-    stream: true,
-    max_tokens: 2048,
-    temperature: 0.4,
-  });
+  let body: string;
+  if (isAnthropic) {
+    const systemMessage = messages.find(m => m.role === "system")?.content;
+    const chatMessages = messages.filter(m => m.role !== "system");
+    body = JSON.stringify({
+      model,
+      messages: chatMessages,
+      system: systemMessage,
+      stream: true,
+      max_tokens: 2048,
+      temperature: 0.4,
+    });
+  } else {
+    body = JSON.stringify({
+      model,
+      messages,
+      stream: true,
+      max_tokens: 2048,
+      temperature: 0.4,
+    });
+  }
+
+  headers["Content-Length"] = String(Buffer.byteLength(body));
 
   const options: https.RequestOptions = {
     hostname,
     path,
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      "HTTP-Referer": "https://arc-lens.dev",
-      "X-Title": "ARC Lens Pro",
-      "Content-Length": Buffer.byteLength(body),
-    },
+    headers,
   };
 
   let buffer = "";
@@ -66,7 +117,7 @@ export function streamChatCompletion(
       let errBody = "";
       res.on("data", (d: Buffer) => (errBody += d.toString()));
       res.on("end", () => {
-        onError(`OpenRouter API error ${res.statusCode}: ${errBody}`);
+        onError(`API error ${res.statusCode}: ${errBody}`);
         onDone();
       });
       return;
@@ -74,7 +125,6 @@ export function streamChatCompletion(
 
     res.on("data", (chunk: Buffer) => {
       buffer += chunk.toString();
-      // SSE lines: "data: {...}\n\n"
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
 
@@ -88,7 +138,7 @@ export function streamChatCompletion(
         }
         try {
           const parsed = JSON.parse(data);
-          const delta = parsed?.choices?.[0]?.delta?.content;
+          const delta = parsed?.choices?.[0]?.delta?.content || parsed?.delta?.text;
           if (delta) {
             onChunk(delta);
           }
