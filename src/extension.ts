@@ -107,33 +107,13 @@ function ensureArcTrainingInstalled(pythonPath: string): Promise<boolean> {
         )
         .then((selection) => {
           if (selection === "Install via pip") {
-            vscode.window.withProgress(
-              {
-                location: vscode.ProgressLocation.Notification,
-                title: "Installing arc-training...",
-                cancellable: false,
-              },
-              (progress) => {
-                return new Promise<void>((resolveInstall, rejectInstall) => {
-                  cp.exec(`"${pythonPath}" -m pip install arc-training`, (installErr, stdout, stderr) => {
-                    if (installErr) {
-                      vscode.window.showErrorMessage(
-                        `Failed to install arc-training: ${stderr || installErr.message}`
-                      );
-                      rejectInstall(installErr);
-                    } else {
-                      vscode.window.showInformationMessage(
-                        "arc-training installed successfully!"
-                      );
-                      resolveInstall();
-                    }
-                  });
-                });
-              }
-            ).then(
-              () => resolve(true),
-              () => resolve(false)
+            const terminal = vscode.window.createTerminal("ARC Lens Setup");
+            terminal.show();
+            terminal.sendText(`"${pythonPath}" -m pip install arc-training`);
+            vscode.window.showInformationMessage(
+              "Follow the installation progress in the terminal. Re-run ARC Lens once complete."
             );
+            resolve(false);
           } else if (selection === "Run in Monitor-Only Mode") {
             resolve(true);
           } else {
