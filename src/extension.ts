@@ -101,18 +101,18 @@ function ensureArcTrainingInstalled(pythonPath: string): Promise<boolean> {
 
       vscode.window
         .showWarningMessage(
-          "The Python package 'arc-training' is not installed in the selected environment. ARC Lens needs it to apply automatic recovery interventions.",
-          "Install via pip",
+          "The Python package 'arc-training' is not installed in the selected environment. Please run the installation command in your active terminal environment.",
+          "Copy Command",
           "Run in Monitor-Only Mode"
         )
         .then((selection) => {
-          if (selection === "Install via pip") {
-            const terminal = vscode.window.createTerminal("ARC Lens Setup");
-            terminal.show();
-            terminal.sendText(`"${pythonPath}" -m pip install arc-training`);
-            vscode.window.showInformationMessage(
-              "Follow the installation progress in the terminal. Re-run ARC Lens once complete."
-            );
+          if (selection === "Copy Command") {
+            const cmd = `"${pythonPath}" -m pip install arc-training`;
+            vscode.env.clipboard.writeText(cmd).then(() => {
+              vscode.window.showInformationMessage(
+                "Installation command copied to clipboard! Paste and run it in your active terminal."
+              );
+            });
             resolve(false);
           } else if (selection === "Run in Monitor-Only Mode") {
             resolve(true);
